@@ -1,4 +1,4 @@
-(defproject io.aviso/tracker "0.1.0"
+(defproject io.aviso/tracker "0.1.1"
   :description "Track per-thread operations when exceptions occur"
   :url "https://github.com/AvisoNovate/tracker"
   :license {:name "Apache Sofware Licencse 2.0"
