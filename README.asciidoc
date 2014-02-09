@@ -1,7 +1,7 @@
 The `io.aviso/tracker` library is used to track operations per-thread; it compliments the stack trace by identifying the reasons
 for the function calls`, not just the fact that they occur.
 
-Tracker builds on `org.clojure/tools.logging` to log tbe operation stack when an exception occurs, 
+Tracker builds on `org.clojure/tools.logging` to log the operation stack when an exception occurs, 
 and uses `io.aviso/pretty` to format the exception it logs.
 
 Here's an example of an exception and operation trace (from the `io.aviso/twixt` test suite):
