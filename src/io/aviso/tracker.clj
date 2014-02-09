@@ -5,7 +5,7 @@
             [io.aviso.exception :as exception]))
 
 ;; Contains a list of messages (or functions that return messages) used to log the route to the exception.
-(def ^:dynamic operation-traces [])
+(def ^:dynamic ^:private operation-traces [])
 
 (defn- trace-to-string
   "Converts a trace to a string; a trace may be a function which is invoked."
