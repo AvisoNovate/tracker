@@ -1,3 +1,5 @@
+image:http://clojars.org/io.aviso/tracker/latest-version.svg[Clojars Project, link="http://clojars.org/io.aviso/tracker"]
+
 The `io.aviso/tracker` library is used to track operations per-thread; it compliments the stack trace by identifying the reasons
 for the function calls`, not just the fact that they occur.
 
