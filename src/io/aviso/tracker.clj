@@ -5,21 +5,15 @@
     [clojure.tools.logging.impl :as impl]
     [io.aviso.exception :as exception]))
 
-;; Contains a list of messages (or functions that return messages) used to log the route to the exception.
-(def ^:dynamic ^:private operation-traces [])
+;;; Contains a vector of messages (or functions that return messages) used to log the route to the exception.
+(def ^:dynamic ^:private operation-traces)
+
+(def ^:dynamic ^:private trace-applied)
 
 (defn- trace-to-string
   "Converts a trace to a string; a trace may be a function which is invoked."
   [message]
   (str (if (fn? message) (message) message)))
-
-(defn- contains-operation-trace
-  "Checks to see if an exception (or any of the exception's causes) is an IExceptionInfo containing an :operation-trace."
-  [^Throwable e]
-  (cond
-    (nil? e) false
-    (some-> e ex-data :operation-trace) true
-    :else (recur (.getCause e))))
 
 (defn- error [logger message]
   (l/log* logger :error nil message))
@@ -31,26 +25,32 @@
   (error logger (format "%s%n%s" message (exception/format-exception e))))
 
 (defn track*
-  "Traces the execution of a function of no arguments. The trace macro converts into a call to track-function.
+  "Tracks the execution of a function of no arguments. The trace macro converts into a call to track*.
   
   logger - SLF4J Logger where logging should occur
   trace-message - String, object, or function. Function evaulation is deferred until an exception is actually thrown.
   f - function to invoke."
   [logger trace f]
-  (binding [operation-traces (conj operation-traces trace)]
+  (if (bound? #'operation-traces)
     (try
+      (swap! operation-traces conj trace)
       (f)
       (catch Throwable e
-        ;; By nature, the track calls get deeply nested. We want to create an exception only at the initial failure,
-        (if (contains-operation-trace e)
+        (if @trace-applied
           (throw e)
-          ;; This is the initial exception thrown so we'll wrap the original exception with the exception info.
-          (let [trace-strings (map trace-to-string operation-traces)
+          (let [trace-strings (mapv trace-to-string @operation-traces)
                 message (or (.getMessage e) (-> e .getClass .getName))]
             (log-trace logger trace-strings message e)
+            (reset! trace-applied true)
             (throw (ex-info message
                             {:operation-trace trace-strings}
-                            e))))))))
+                            e)))))
+      (finally
+        (swap! operation-traces pop)))
+    ;; Else, if not yet bound..
+    (binding [operation-traces (atom [])
+              trace-applied (atom false)]
+      (track* logger trace f))))
 
 (defn get-logger
   "Determines the logger instance for a namespace (by leveraging some clojure.tools.logging internals)."
@@ -58,7 +58,7 @@
   (impl/get-logger l/*logger-factory* namespace))
 
 (defmacro track
-  "Tracks the execution of an operation, associating the trace (which describes the opeation) with the execution of the body.
+  "Tracks the execution of an operation, associating the trace (which describes the operation) with the execution of the body.
 
   If an exception occurs inside the body, then all trace messages leading up to the
   point of the exception will be logged (the logger is determined from the current namespace); thus logging only occurs at the
