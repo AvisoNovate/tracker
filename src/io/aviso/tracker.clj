@@ -1,8 +1,9 @@
 (ns io.aviso.tracker
   "Code for tracing behavior so that it can be logged when there's an exception."
-  (:require [clojure.tools.logging :as l]
-            [clojure.tools.logging.impl :as impl]
-            [io.aviso.exception :as exception]))
+  (:require
+    [clojure.tools.logging :as l]
+    [clojure.tools.logging.impl :as impl]
+    [io.aviso.exception :as exception]))
 
 ;; Contains a list of messages (or functions that return messages) used to log the route to the exception.
 (def ^:dynamic ^:private operation-traces [])
@@ -11,7 +12,7 @@
   "Converts a trace to a string; a trace may be a function which is invoked."
   [message]
   (str (if (fn? message) (message) message)))
-    
+
 (defn- contains-operation-trace
   "Checks to see if an exception (or any of the exception's causes) is an IExceptionInfo containing an :operation-trace."
   [^Throwable e]
