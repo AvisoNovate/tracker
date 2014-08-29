@@ -8,7 +8,7 @@
 ;;; Contains a vector of messages (or functions that return messages) used to log the route to the exception.
 (def ^:dynamic ^:private operation-traces)
 
-(def ^:dynamic ^:private trace-applied)
+(def ^:dynamic ^:private innermost-exception)
 
 (defn- trace-to-string
   "Converts a trace to a string; a trace may be a function which is invoked."
@@ -36,20 +36,20 @@
       (swap! operation-traces conj trace)
       (f)
       (catch Throwable e
-        (if @trace-applied
-          (throw e)
+        (if @innermost-exception
           (let [trace-strings (mapv trace-to-string @operation-traces)
                 message (or (.getMessage e) (-> e .getClass .getName))]
             (log-trace logger trace-strings message e)
-            (reset! trace-applied true)
+            (reset! innermost-exception false)
             (throw (ex-info message
                             {:operation-trace trace-strings}
-                            e)))))
+                            e)))
+          (throw e)))
       (finally
         (swap! operation-traces pop)))
     ;; Else, if not yet bound..
     (binding [operation-traces (atom [])
-              trace-applied (atom false)]
+              innermost-exception (atom true)]
       (track* logger trace f))))
 
 (defn get-logger
