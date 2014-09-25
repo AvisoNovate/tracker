@@ -1,20 +1,20 @@
 (ns io.aviso.tracker
-  "Code for tracing behavior so that it can be logged when there's an exception."
+  "Code for tracking operations so that a history can be presented when an exception is thrown."
   (:require
     [clojure.tools.logging :as l]
     [clojure.tools.logging.impl :as impl]
     [io.aviso.exception :as exception]))
 
 ;;; Contains a vector of messages (or functions that return messages) used to log the route to the exception.
-(def ^:dynamic ^:private operation-traces)
+(def ^:dynamic ^:private *operation-traces*)
 
-(def ^:dynamic ^:private innermost-exception)
+(def ^:dynamic ^:private *innermost-exception*)
 
 (def ^:dynamic *log-traces*
   "A boolean to control the whether traces are logged at :trace level as they are created."
   false)
 
-(defn- trace-to-string
+(defn- label-to-string
   "Converts a trace to a string; a trace may be a function which is invoked."
   [message]
   (str (if (fn? message) (message) message)))
@@ -22,9 +22,9 @@
 (defn- error [logger message]
   (l/log* logger :error nil message))
 
-(defn- log-trace [logger trace-messages message e]
+(defn- log-trace-label-stack [logger trace-labels message e]
   (error logger "An exception has occurred:")
-  (doseq [[trace-message i] (map vector trace-messages (iterate inc 1))]
+  (doseq [[trace-message i] (map vector trace-labels (iterate inc 1))]
     (error logger (format "[%3d] - %s" i trace-message)))
   (error logger (format "%s%n%s" message (exception/format-exception e))))
 
@@ -32,36 +32,36 @@
   "Tracks the execution of a function of no arguments. The trace macro converts into a call to track*.
   
   logger
-  : SLF4J Logger where logging should occur
+  : Logger where logging should occur (as defined by the clojure.tools.logging Logger protocol)
 
-  trace-message
+  label
   : String, object, or function. If a function, the function will only be evaluated if the message
     needs to be printed (when an exception occurs, or when logging traces via [[*log-traces*]]).
 
   f
   : function to invoke. track* returns the result from this function."
-  [logger trace f]
-  (if (bound? #'operation-traces)
+  [logger label f]
+  (if (bound? #'*operation-traces*)
     (try
-      (swap! operation-traces conj trace)
-      (when *log-traces* (l/log* logger :trace nil (trace-to-string trace)))
+      (swap! *operation-traces* conj label)
+      (when *log-traces* (l/log* logger :trace nil (label-to-string label)))
       (f)
       (catch Throwable e
-        (if @innermost-exception
-          (let [trace-strings (mapv trace-to-string @operation-traces)
+        (if @*innermost-exception*
+          (let [trace-label-strings (mapv label-to-string @*operation-traces*)
                 message (or (.getMessage e) (-> e .getClass .getName))]
-            (log-trace logger trace-strings message e)
-            (reset! innermost-exception false)
+            (log-trace-label-stack logger trace-label-strings message e)
+            (reset! *innermost-exception* false)
             (throw (ex-info message
-                            {:operation-trace trace-strings}
+                            {:operation-trace trace-label-strings}
                             e)))
           (throw e)))
       (finally
-        (swap! operation-traces pop)))
+        (swap! *operation-traces* pop)))
     ;; Else, if not yet bound..
-    (binding [operation-traces (atom [])
-              innermost-exception (atom true)]
-      (track* logger trace f))))
+    (binding [*operation-traces* (atom [])
+              *innermost-exception* (atom true)]
+      (track* logger label f))))
 
 (defn get-logger
   "Determines the logger instance for a namespace (by leveraging some clojure.tools.logging internals)."
@@ -69,15 +69,16 @@
   (impl/get-logger l/*logger-factory* namespace))
 
 (defmacro track
-  "Tracks the execution of an operation, associating the trace (which describes the operation) with the execution of the body.
+  "Tracks the execution of an operation, associating the label (which describes the operation) with the execution of the body.
 
-  If an exception occurs inside the body, then all trace messages leading up to the
+  If an exception occurs inside the body, then all labels leading up to the
   point of the exception will be logged (the logger is determined from the current namespace); thus logging only occurs at the
-  most deeply nested trace. The exception thrown is formatted and logged as well.
+  most deeply nested label. The exception thrown is formatted and logged as well.  The actual exception will be rethrown, wrapped in a
+  new `ex-info` exception, with key `:operation-trace` set to the vector of operation trace strings.
 
-  trace may be a string, an object, or a function that returns a string; execution of the function is deferred until needed."
-  [trace & body]
-  `(track* (get-logger ~*ns*) ~trace #(do ~@body)))
+  label may be a string, an object, or a function that returns a string; execution of the function is deferred until needed."
+  [label & body]
+  `(track* (get-logger ~*ns*) ~label #(do ~@body)))
 
 (defn timer*
   "Executes a function, timing the duration. It then calculates the elapsed time in milliseconds (as a double) and passes that to a second function.
