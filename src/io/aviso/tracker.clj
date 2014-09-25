@@ -10,7 +10,9 @@
 
 (def ^:dynamic ^:private innermost-exception)
 
-(def ^:dynamic *log-traces* "A boolean to control the whether traces are logged at :trace level as they are created" false)
+(def ^:dynamic *log-traces*
+  "A boolean to control the whether traces are logged at :trace level as they are created."
+  false)
 
 (defn- trace-to-string
   "Converts a trace to a string; a trace may be a function which is invoked."
@@ -29,14 +31,20 @@
 (defn track*
   "Tracks the execution of a function of no arguments. The trace macro converts into a call to track*.
   
-  logger - SLF4J Logger where logging should occur
-  trace-message - String, object, or function. Function evaulation is deferred until an exception is actually thrown.
-  f - function to invoke."
+  logger
+  : SLF4J Logger where logging should occur
+
+  trace-message
+  : String, object, or function. If a function, the function will only be evaluated if the message
+    needs to be printed (when an exception occurs, or when logging traces via [[*log-traces*]]).
+
+  f
+  : function to invoke. track* returns the result from this function."
   [logger trace f]
   (if (bound? #'operation-traces)
     (try
       (swap! operation-traces conj trace)
-      (when *log-traces* (l/log* logger :trace nil trace))
+      (when *log-traces* (l/log* logger :trace nil (trace-to-string trace)))
       (f)
       (catch Throwable e
         (if @innermost-exception
@@ -67,7 +75,7 @@
   point of the exception will be logged (the logger is determined from the current namespace); thus logging only occurs at the
   most deeply nested trace. The exception thrown is formatted and logged as well.
 
-  trace may be a string, or a function that returns a string; execution of the function is deferred until needed. "
+  trace may be a string, an object, or a function that returns a string; execution of the function is deferred until needed."
   [trace & body]
   `(track* (get-logger ~*ns*) ~trace #(do ~@body)))
 
