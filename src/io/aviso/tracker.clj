@@ -10,6 +10,8 @@
 
 (def ^:dynamic ^:private innermost-exception)
 
+(def ^:dynamic *log-traces* "A boolean to control the whether traces are logged at :trace level as they are created" false)
+
 (defn- trace-to-string
   "Converts a trace to a string; a trace may be a function which is invoked."
   [message]
@@ -34,6 +36,7 @@
   (if (bound? #'operation-traces)
     (try
       (swap! operation-traces conj trace)
+      (when *log-traces* (l/log* logger :trace nil trace))
       (f)
       (catch Throwable e
         (if @innermost-exception
