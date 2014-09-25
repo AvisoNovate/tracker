@@ -7,5 +7,6 @@
                  [org.clojure/tools.logging "0.3.0"]
                  [io.aviso/pretty "0.1.12"]]
   :codox {:src-dir-uri               "https://github.com/AvisoNovate/tracker/blob/master/"
-          :src-linenum-anchor-prefix "L"}
+          :src-linenum-anchor-prefix "L"
+          :defaults {:doc/format :markdown}}
   :profiles {:dev {:dependencies [[log4j "1.2.17"]]}})
