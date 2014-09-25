@@ -68,7 +68,9 @@ The first parameter to `track` can be a string, or a function (of no argments) t
 The remaining parameters are evaluated inside a `try` block that will catch exceptions, perform logging
 of the operations if necessary, then re-throw the exception.
 
-Rebinding the `*log-traces*` dynamic to `true` results in the traces being logged at `:trace` level just before the body is executed.
+Rebinding the dynamic `*log-traces*` var to `true` results in the traces being logged at `:trace` level
+just before the body is executed. This is useful when tracking down behavior problems that do not directly
+result in exceptions.
 
 == Notes
 
