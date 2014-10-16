@@ -1,0 +1,88 @@
+title: About Tracker
+---
+
+== Enhance Your Stack Traces
+%={:type :github :user "AvisoNovate" :repo "tracker"}%
+
+image:http://clojars.org/io.aviso/tracker/latest-version.svg[Clojars Project, link="http://clojars.org/io.aviso/tracker"]
+
+The `io.aviso/tracker` library is used to track operations per-thread; it compliments the stack trace by identifying the reasons
+for the function calls`, not just the fact that they occur.
+
+Tracker builds on `org.clojure/tools.logging` to log the operation stack when an exception occurs, 
+and uses `io.aviso/pretty` to format the exception it logs.
+
+Here's an example of an exception and operation trace (from the `io.aviso/twixt` test suite):
+
+----
+ERROR [                main] io.aviso.twixt.coffee-script An exception has occurred:
+ERROR [                main] io.aviso.twixt.coffee-script [  1] - Accessing asset `invalid-coffeescript.coffee'
+ERROR [                main] io.aviso.twixt.coffee-script [  2] - Compiling `META-INF/assets/invalid-coffeescript.coffee' to JavaScript
+ERROR [                main] io.aviso.twixt.coffee-script META-INF/assets/invalid-coffeescript.coffee:6:1: error: unexpected INDENT
+      argument: dep2
+^^^^^^
+java.lang.RuntimeException: META-INF/assets/invalid-coffeescript.coffee:6:1: error: unexpected INDENT
+                                  argument: dep2
+                            ^^^^^^
+  io.aviso.twixt.coffee-script/coffee-script-compiler/fn/fn                 coffee_script.clj:   27
+                                    io.aviso.tracker/track*                       tracker.clj:   41
+     io.aviso.twixt.coffee-script/coffee-script-compiler/fn                 coffee_script.clj:   17
+                                    io.aviso.tracker/timer*                       tracker.clj:   75
+        io.aviso.twixt.coffee-script/coffee-script-compiler                 coffee_script.clj:   15
+               io.aviso.twixt.utils/content-type-matcher/fn                         utils.clj:   63
+               io.aviso.twixt.utils/content-type-matcher/fn                         utils.clj:   61
+      io.aviso.twixt.css-rewrite/wrap-with-css-rewriting/fn                   css_rewrite.clj:   52
+      io.aviso.twixt.fs-cache/wrap-with-filesystem-cache/fn                      fs_cache.clj:  103
+io.aviso.twixt.memory-cache/wrap-with-invalidating-cache/fn                  memory_cache.clj:   70
+           io.aviso.twixt.compress/wrap-with-compression/fn                      compress.clj:   45
+           io.aviso.twixt.compress/with-cache-delegation/fn                      compress.clj:   56
+                     io.aviso.twixt/wrap-with-tracing/fn/fn                         twixt.clj:  136
+                                    io.aviso.tracker/track*                       tracker.clj:   41
+                        io.aviso.twixt/wrap-with-tracing/fn                         twixt.clj:  134
+----                        
+
+Tracker is available under the terms of the Apache Sofware License 2.0.
+
+== Usage
+
+After `require`-ing the `io.aviso.tracker` namespace as `t`, just make use of calls to `t/track`:
+
+Here's an example from `io.aviso/twixt`:
+
+[source,clojure]
+----
+(defn- read-cached-asset
+  "Attempt to read the cached asset, if it exists.
+
+  asset-cache-dir is the directory containing the two files (asset.edn and content)."
+  [^File asset-cache-dir]
+  (if (.exists asset-cache-dir)
+    (t/track
+      #(format "Reading from asset cache `%s'" asset-cache-dir)
+      (some->
+        (io/file asset-cache-dir asset-file-name)
+        read-cached-asset-data
+        (assoc :content (io/file asset-cache-dir content-file-name))))))
+----
+
+The first parameter to `track` can be a string, or a function (of no argments) that returns a string. 
+The remaining parameters are evaluated inside a `try` block that will catch exceptions, perform logging
+of the operations if necessary, then re-throw the exception.
+
+Rebinding the dynamic `*log-traces*` var to `true` results in the traces being logged at `:trace` level
+just before the body is executed. This is useful when tracking down behavior problems that do not directly
+result in exceptions.
+
+== Notes
+
+=== Exceptions are wrapped
+
+The inner-most exception that is caught by a `track` will be wrapped as an `ex-info` that includes the `:operation-trace` key,
+and the original exception as the cause.
+
+=== Watch out for laziness
+
+No magic is going on with respect to laziness; this means that code inside a `track` may return a lazy value that gets evaluated later,
+losing the benefit of being inside a `track`.
+
+

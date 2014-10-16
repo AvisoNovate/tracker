@@ -1,0 +1,6 @@
+{:name        "Tracker Manual"
+ :description "Enhance Your Stack Traces."
+ :github      "AvisoNovate/tracker"
+ :api         "http://howardlewisship.com/io.aviso/tracker"
+ :pages       ["index"]
+}
