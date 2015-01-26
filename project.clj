@@ -17,4 +17,5 @@
             :codox {:src-dir-uri               "https://github.com/AvisoNovate/tracker/blob/master/"
                     :src-linenum-anchor-prefix "L"
                     :defaults                  {:doc/format :markdown}}
-            :profiles {:dev {:dependencies [[log4j "1.2.17"]]}})
+            :profiles {:dev {:dependencies [[org.slf4j/slf4j-api "1.7.6"]
+                                            [ch.qos.logback/logback-classic "1.1.1"]]}})
