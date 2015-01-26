@@ -1,18 +1,37 @@
 (ns io.aviso.tracker
   "Code for tracking operations so that a history can be presented when an exception is thrown."
-  (:require
-    [clojure.tools.logging :as l]
-    [clojure.tools.logging.impl :as impl]
-    [io.aviso.exception :as exception]))
+  (:require [clojure.string :as str]
+            [clojure.tools.logging :as l]
+            [clojure.tools.logging.impl :as impl]
+            [io.aviso.writer :as writer]
+            [io.aviso.exception :as exception])
+  (:import (java.util WeakHashMap Map)))
 
 ;;; Contains a vector of messages (or functions that return messages) used to log the route to the exception.
-(def ^:dynamic ^:private *operation-traces*)
+(def ^:dynamic *operation-traces*
+  "Contains a vector of operation traces (as passed to [[trace]]). These are used to log operations, when exceptions
+  occur."
+  [])
 
-(def ^:dynamic ^:private *innermost-exception*)
+(def ^:dynamic *log-trace-level*
+  "Controls whether operation traces are logged on entry to the [[track]] macro. By default (nil), no
+  logging takes places.  Otherwise, this is a level (such as :debug or :info) to be used."
+  nil)
 
-(def ^:dynamic *log-traces*
-  "A boolean to control the whether traces are logged at :trace level as they are created."
-  false)
+(def ^:private ^Map log-exceptions?
+  (WeakHashMap.))
+
+(defn- set-should-log-operations!
+  [flag]
+  (locking log-exceptions?
+    (if flag
+      (.put log-exceptions? (Thread/currentThread) true)
+      (.remove log-exceptions? (Thread/currentThread)))))
+
+(defn- should-log-operations?
+  []
+  (locking log-exceptions?
+    (.get log-exceptions? (Thread/currentThread))))
 
 (defn- label-to-string
   "Converts a trace to a string; a trace may be a function which is invoked."
@@ -22,11 +41,15 @@
 (defn- error [logger message]
   (l/log* logger :error nil message))
 
-(defn- log-trace-label-stack [logger trace-labels message e]
-  (error logger "An exception has occurred:")
-  (doseq [[trace-message i] (map vector trace-labels (iterate inc 1))]
-    (error logger (format "[%3d] - %s" i trace-message)))
-  (error logger (format "%s%n%s" message (exception/format-exception e))))
+(defn- log-trace-label-stack [logger trace-labels e]
+  (let [lines (concat ["An exception has occurred."]
+                      (map-indexed (fn [i label]
+                                     (format "[%3d] - %s" (inc i) label))
+                                   trace-labels)
+                      [(exception/format-exception e)])]
+    (->> lines
+         (str/join writer/eol)
+         (error logger))))
 
 (defn track*
   "Tracks the execution of a function of no arguments. The trace macro converts into a call to track*.
@@ -41,27 +64,22 @@
   f
   : function to invoke. track* returns the result from this function."
   [logger label f]
-  (if (bound? #'*operation-traces*)
+  (binding [*operation-traces* (conj *operation-traces* label)]
+    (set-should-log-operations! true)
     (try
-      (swap! *operation-traces* conj label)
-      (when *log-traces* (l/log* logger :trace nil (label-to-string label)))
+      (when *log-trace-level*
+        (l/log* logger *log-trace-level* nil (label-to-string label)))
       (f)
       (catch Throwable e
-        (if @*innermost-exception*
-          (let [trace-label-strings (mapv label-to-string @*operation-traces*)
+        (if (should-log-operations?)
+          (let [trace-label-strings (mapv label-to-string *operation-traces*)
                 message (or (.getMessage e) (-> e .getClass .getName))]
-            (log-trace-label-stack logger trace-label-strings message e)
-            (reset! *innermost-exception* false)
+            (log-trace-label-stack logger trace-label-strings e)
+            (set-should-log-operations! false)
             (throw (ex-info message
                             {:operation-trace trace-label-strings}
                             e)))
-          (throw e)))
-      (finally
-        (swap! *operation-traces* pop)))
-    ;; Else, if not yet bound..
-    (binding [*operation-traces* (atom [])
-              *innermost-exception* (atom true)]
-      (track* logger label f))))
+          (throw e))))))
 
 (defn get-logger
   "Determines the logger instance for a namespace (by leveraging some clojure.tools.logging internals)."
@@ -76,7 +94,13 @@
   most deeply nested label. The exception thrown is formatted and logged as well.  The actual exception will be rethrown, wrapped in a
   new `ex-info` exception, with key `:operation-trace` set to the vector of operation trace strings.
 
-  label may be a string, an object, or a function that returns a string; execution of the function is deferred until needed."
+  label may be a string, an object, or a function that returns a string; execution of the function is deferred until
+  an operation trace label is needed.
+
+  The operation trace is stored in a dynamic var; if you make use of Clojure's bound-fn macro to execute code in a new thread
+  with the same bindings, then operations in a new thread will log as successors to operations in the current thread.
+
+  Note that the clojure.core.async thead and go macros *do* propogate bindings to new threads."
   [label & body]
   `(track* (get-logger ~*ns*) ~label #(do ~@body)))
 
