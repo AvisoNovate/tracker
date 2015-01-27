@@ -1,4 +1,8 @@
-## 0.1.4 -- UNRELEASED
+## 0.1.4 -- 27 Jan 2015
+
+Convert a label function to a string early, if it will be logged immediately due to \*log-trace-level\*.
+
+Add a function for retrieving the current list of operations.
 
 ## 0.1.3 -- 26 Jan 2015
 
