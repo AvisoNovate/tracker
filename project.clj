@@ -5,7 +5,8 @@
                       :url  "http://www.apache.org/licenses/LICENSE-2.0.html"}
             :dependencies [[org.clojure/clojure "1.6.0"]
                            [org.clojure/tools.logging "0.3.0"]
-                           [io.aviso/pretty "0.1.12"]]
+                           [io.aviso/pretty "0.1.14"]
+                           [io.aviso/toolchest "0.1.1"]]
             :plugins [[lein-shell "0.4.0"]]
             :shell {:commands {"scp" {:dir "doc"}}}
             :aliases {"deploy-doc" ["shell"

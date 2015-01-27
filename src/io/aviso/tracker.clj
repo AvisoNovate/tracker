@@ -4,18 +4,19 @@
             [clojure.tools.logging :as l]
             [clojure.tools.logging.impl :as impl]
             [io.aviso.writer :as writer]
-            [io.aviso.exception :as exception])
+            [io.aviso.exception :as exception]
+            [io.aviso.toolchest.exceptions :refer [to-message]])
   (:import (java.util WeakHashMap Map)))
 
 ;;; Contains a vector of messages (or functions that return messages) used to log the route to the exception.
-(def ^:dynamic *operation-traces*
-  "Contains a vector of operation traces (as passed to [[trace]]). These are used to log operations, when exceptions
+(def ^:private ^:dynamic *operation-labels*
+  "Contains a vector of operation labels (as passed to [[trace]]). These are used to log operations, when exceptions
   occur."
   [])
 
 (def ^:dynamic *log-trace-level*
-  "Controls whether operation traces are logged on entry to the [[track]] macro. By default (nil), no
-  logging takes places.  Otherwise, this is a level (such as :debug or :info) to be used."
+  "Controls whether operation labels are logged on entry to the [[track]] macro. By default (nil), no
+  logging takes places.  Otherwise, this is a logging level (such as :debug or :info) to be used."
   nil)
 
 (def ^:private ^Map log-exceptions?
@@ -34,15 +35,22 @@
     (.get log-exceptions? (Thread/currentThread))))
 
 (defn- label-to-string
-  "Converts a trace to a string; a trace may be a function which is invoked."
+  "Converts a trace to a string; a trace may be a function which is invoked, a string, or any object that can be converted to a string."
   [message]
   (str (if (fn? message) (message) message)))
+
+(defn operation-labels
+  "Returns the labels for the current operations as a vector of strings. The outermost operation is first,
+  the innermost operation is last."
+  {:added "0.1.4"}
+  []
+  (mapv label-to-string *operation-labels*))
 
 (defn- error [logger message]
   (l/log* logger :error nil message))
 
 (defn- log-trace-label-stack [logger trace-labels e]
-  (let [lines (concat ["An exception has occurred."]
+  (let [lines (concat ["An exception has occurred:"]
                       (map-indexed (fn [i label]
                                      (format "[%3d] - %s" (inc i) label))
                                    trace-labels)
@@ -64,22 +72,29 @@
   f
   : function to invoke. track* returns the result from this function."
   [logger label f]
-  (binding [*operation-traces* (conj *operation-traces* label)]
-    (set-should-log-operations! true)
-    (try
-      (when *log-trace-level*
-        (l/log* logger *log-trace-level* nil (label-to-string label)))
-      (f)
-      (catch Throwable e
-        (if (should-log-operations?)
-          (let [trace-label-strings (mapv label-to-string *operation-traces*)
-                message (or (.getMessage e) (-> e .getClass .getName))]
-            (log-trace-label-stack logger trace-label-strings e)
-            (set-should-log-operations! false)
-            (throw (ex-info message
-                            {:operation-trace trace-label-strings}
-                            e)))
-          (throw e))))))
+  (let [level' *log-trace-level*
+        ;; Convert the label to a string immediately, if it is going to be logged
+        ;; immediately. Otherwise, leave the object or function as-is, until it is actually needed.
+        label' (if (and level'
+                        (fn? label)
+                        (impl/enabled? logger level'))
+                 (label-to-string label)
+                 label)]
+    (binding [*operation-labels* (conj *operation-labels* label')]
+      (set-should-log-operations! true)
+      (try
+        (when level'
+          (l/log* logger *log-trace-level* nil label'))
+        (f)
+        (catch Throwable t
+          (if (should-log-operations?)
+            (let [trace-label-strings (operation-labels)]
+              (log-trace-label-stack logger trace-label-strings t)
+              (set-should-log-operations! false)
+              (throw (ex-info (to-message t)
+                              {:operation-trace trace-label-strings}
+                              t)))
+            (throw t)))))))
 
 (defn get-logger
   "Determines the logger instance for a namespace (by leveraging some clojure.tools.logging internals)."
