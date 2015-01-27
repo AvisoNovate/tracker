@@ -7,6 +7,7 @@
                            [org.clojure/tools.logging "0.3.0"]
                            [io.aviso/pretty "0.1.12"]]
             :plugins [[lein-shell "0.4.0"]]
+            :shell {:commands {"scp" {:dir "doc"}}}
             :aliases {"deploy-doc" ["shell"
                                     "scp" "-r" "." "hlship_howardlewisship@ssh.phx.nearlyfreespeech.net:io.aviso/tracker"]
                       "release"    ["do"
