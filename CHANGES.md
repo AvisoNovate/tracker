@@ -1,3 +1,5 @@
+## 0.1.4 -- UNRELEASED
+
 ## 0.1.3 -- 26 Jan 2015
 
 Operation traces are no longer stored in an atom; they are a persistent vector that is dynamically bound.
