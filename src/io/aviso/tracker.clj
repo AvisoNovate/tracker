@@ -165,6 +165,9 @@
   Note that the clojure.core.async thread and go macros *do* propogate bindings to new threads, but it will be necessary
   to use the [[checkpoint]] macro to get the full benefit of operation tracking.
 
+  Because of how the go macro rewrites code, track will typically not work correctly inside a go block; however
+  [[checkpoint]] will.
+
   See also: [[*log-trace-level*]]."
   [label & body]
   `(track* (get-logger ~*ns*) ~label ~@body))
