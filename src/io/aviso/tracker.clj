@@ -7,8 +7,7 @@
             [clojure.tools.logging.impl :as impl]
             [io.aviso.writer :as writer]
             [io.aviso.exception :as exception]
-            [io.aviso.toolchest.exceptions :refer [to-message]])
-  (:import [java.util WeakHashMap Map]))
+            [io.aviso.toolchest.exceptions :refer [to-message]]))
 
 ;;; Contains a vector of messages (or functions that return messages) used to log the route to the exception.
 (def ^:no-doc ^:dynamic *operation-labels*
@@ -24,22 +23,6 @@
   "Determines the logger instance for a namespace (by leveraging some clojure.tools.logging internals)."
   [namespace]
   (impl/get-logger l/*logger-factory* namespace))
-
-(def ^:private ^Map log-exceptions?
-  (WeakHashMap.))
-
-;; made public for a macro, but is internal and not documented
-(defn ^:no-doc set-should-log-operations!
-  [flag]
-  (locking log-exceptions?
-    (if flag
-      (.put log-exceptions? (Thread/currentThread) true)
-      (.remove log-exceptions? (Thread/currentThread)))))
-
-(defn- should-log-operations?
-  []
-  (locking log-exceptions?
-    (.get log-exceptions? (Thread/currentThread))))
 
 (defn ^:no-doc label-to-string
   [message]
@@ -66,15 +49,29 @@
          (str/join writer/eol)
          (error logger))))
 
+(defn- should-log-operations?
+  "Checks the exception, and its chain of causes, for the ::operations-logged flag."
+  [^Throwable t]
+  (cond
+    (nil? t) true
+
+    (-> t ex-data ::operations-logged)
+    false
+
+    :else
+    (recur (.getCause t))))
+
 (defn ^:no-doc handle-checkpoint-exception
   "Handler for exceptions inside [[checkpoint*]]."
   [logger t]
-  (if (should-log-operations?)
+  (if (should-log-operations? t)
     (let [trace-label-strings (operation-labels)]
       (log-trace-label-stack logger trace-label-strings t)
-      (set-should-log-operations! false)
       (throw (ex-info (to-message t)
-                      {:operation-trace trace-label-strings}
+                      {:operation-trace trace-label-strings
+                       ;; This acts as a marker to suppress further logging of the operation trace
+                       ;; as the stack unwinds.
+                       ::operations-logged true}
                       t)))
     (throw t)))
 
@@ -91,11 +88,16 @@
   it includes the operation trace (the sequence of active operation labels), then the formatted exception.
 
   In the logging case, the exception is rethrown, wrapped as a new ex-info exception, with :operation-trace
-  as the vector of operation label strings."
+  as the vector of operation label strings.
+
+  It is important to maintain the chain of exception causes, inside catch clauses, as the stack unwinds.
+  The wrapped exception includes a private key used to identify if the operation trace has been logged, as
+  the stack unwinds. If this chain of causes is broken, you will see redundant logging of the exception log.
+  Basically, if you catch an exception, either throw it, consume it, or wrap it in a new exception ... but
+  don't just throw a new exception."
   {:added "0.1.5"}
   [logger & body]
   `(try
-     (set-should-log-operations! true)
      ~@body
      (catch Throwable t#
        (handle-checkpoint-exception ~logger t#))))
