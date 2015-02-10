@@ -1,3 +1,8 @@
+## 0.1.5 -- 10 Feb 2015
+
+Added several macros and functions to assist when an operation may span across mutliple threads,
+such as when using clojure.core.async.
+
 ## 0.1.4 -- 27 Jan 2015
 
 Convert a label function to a string early, if it will be logged immediately due to \*log-trace-level\*.
