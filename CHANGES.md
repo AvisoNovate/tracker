@@ -1,3 +1,11 @@
+## 0.1.6 -- 10 Feb 2014
+
+Quick update to convert checkpoint* to a macro, so that it can be used inside a clojure.core.async go
+block.
+
+In addition, track* has been converted to a macro. It now accepts a sequence of forms, rather than
+a no-arguments function.
+
 ## 0.1.5 -- 10 Feb 2015
 
 Added several macros and functions to assist when an operation may span across mutliple threads,

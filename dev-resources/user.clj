@@ -1,20 +1,18 @@
 (ns user
   (:use io.aviso.repl
         io.aviso.logging
-        io.aviso.tracker
-        clojure.pprint)
-  (:require [clojure.tools.logging :as l]))
+        clojure.pprint))
 
 (install-pretty-exceptions)
 (io.aviso.logging/install-pretty-logging)
 (io.aviso.logging/install-uncaught-exception-handler)
 
+(use 'io.aviso.tracker)
+
 (defmacro other-thread
   [& body]
   `(.start (Thread. (bound-fn []
-                      (checkpoint
-                        ~@body)))))
-
+                      (checkpoint ~@body)))))
 
 (defn demo-1
   []
