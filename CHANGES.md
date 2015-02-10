@@ -8,7 +8,7 @@ a no-arguments function.
 
 ## 0.1.5 -- 10 Feb 2015
 
-Added several macros and functions to assist when an operation may span across mutliple threads,
+Added several macros and functions to assist when an operation may span across multiple threads,
 such as when using clojure.core.async.
 
 ## 0.1.4 -- 27 Jan 2015
@@ -23,7 +23,7 @@ Operation traces are no longer stored in an atom; they are a persistent vector t
 This allows an operation to start in one thread and 'continue' in another (if Clojure's bound-fn is used
 to communicate the bound Vars into the new thread, as Clojure core.async does).
 
-The \*log-traces\* var has replaces with \*log-trace-level\*.
+The \*log-traces\* var has been replaced with \*log-trace-level\*.
 This new Var is used to define the level (such as
 :debug or :info) to use when logging each operation's label, at the start of each operation.
 It defaults to nil, which does not log the operation label on entry (only when an exception has occurred).
