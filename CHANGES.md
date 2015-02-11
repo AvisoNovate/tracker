@@ -1,3 +1,5 @@
+## 0.1.7 -- UNRELEASED
+
 ## 0.1.6 -- 10 Feb 2014
 
 Quick update to convert checkpoint* to a macro, so that it can be used inside a clojure.core.async go

@@ -1,39 +1,54 @@
 image:http://clojars.org/io.aviso/tracker/latest-version.svg[Clojars Project, link="http://clojars.org/io.aviso/tracker"]
 
-Tacker is a library  used to track operations per-thread; it compliments the stack trace by identifying the reasons
+Tracker is a library  used to track operations per-thread or even between threads; it compliments the stack trace by identifying the reasons
 for the function calls`, not just the fact that they occur.
 
 Here's an example of an exception and operation trace (from the Twixt test suite):
 
 [source]
 ----
-ERROR [                main] io.aviso.twixt.coffee-script An exception has occurred:
-ERROR [                main] io.aviso.twixt.coffee-script [  1] - Accessing asset `invalid-coffeescript.coffee'
-ERROR [                main] io.aviso.twixt.coffee-script [  2] - Compiling `META-INF/assets/invalid-coffeescript.coffee' to JavaScript
-ERROR [                main] io.aviso.twixt.coffee-script META-INF/assets/invalid-coffeescript.coffee:6:1: error: unexpected INDENT
-      argument: dep2
-^^^^^^
-java.lang.RuntimeException: META-INF/assets/invalid-coffeescript.coffee:6:1: error: unexpected INDENT
+ERROR [      nREPL-worker-0] io.aviso.twixt.coffee-script An exception has occurred:
+[  1] - Accessing asset `invalid-coffeescript.coffee'
+[  2] - Compiling `META-INF/assets/invalid-coffeescript.coffee' to JavaScript
+                               io.aviso.twixt-spec/eval4825/fn/fn/fn       twixt_spec.clj: 155
+                        io.aviso.twixt/wrap-pipeline-with-tracing/fn            twixt.clj: 194
+                 io.aviso.twixt/wrap-pipeline-with-asset-resolver/fn            twixt.clj: 246
+                    io.aviso.twixt.compress/with-cache-delegation/fn         compress.clj:  61
+           io.aviso.twixt.compress/wrap-pipeline-with-compression/fn         compress.clj:  49
+         io.aviso.twixt.memory-cache/wrap-with-invalidating-cache/fn     memory_cache.clj:  75
+               io.aviso.twixt.fs-cache/wrap-with-filesystem-cache/fn         fs_cache.clj: 144
+               io.aviso.twixt.css-rewrite/wrap-with-css-rewriting/fn      css_rewrite.clj:  64
+io.aviso.twixt.js-minification/wrap-with-javascript-minimizations/fn  js_minification.clj:  47
+io.aviso.twixt/wrap-pipeline-with-per-content-type-transformation/fn            twixt.clj: 203
+                 io.aviso.twixt.coffee-script/coffee-script-compiler    coffee_script.clj:  22
+                                             io.aviso.tracker/timer*          tracker.clj: 180
+              io.aviso.twixt.coffee-script/coffee-script-compiler/fn    coffee_script.clj:  35
+java.lang.RuntimeException: META-INF/assets/invalid-coffeescript.coffee:6:1: error: unexpected indentation
                                   argument: dep2
                             ^^^^^^
-  io.aviso.twixt.coffee-script/coffee-script-compiler/fn/fn                 coffee_script.clj:   27
-                                    io.aviso.tracker/track*                       tracker.clj:   41
-     io.aviso.twixt.coffee-script/coffee-script-compiler/fn                 coffee_script.clj:   17
-                                    io.aviso.tracker/timer*                       tracker.clj:   75
-        io.aviso.twixt.coffee-script/coffee-script-compiler                 coffee_script.clj:   15
-               io.aviso.twixt.utils/content-type-matcher/fn                         utils.clj:   63
-               io.aviso.twixt.utils/content-type-matcher/fn                         utils.clj:   61
-      io.aviso.twixt.css-rewrite/wrap-with-css-rewriting/fn                   css_rewrite.clj:   52
-      io.aviso.twixt.fs-cache/wrap-with-filesystem-cache/fn                      fs_cache.clj:  103
-io.aviso.twixt.memory-cache/wrap-with-invalidating-cache/fn                  memory_cache.clj:   70
-           io.aviso.twixt.compress/wrap-with-compression/fn                      compress.clj:   45
-           io.aviso.twixt.compress/with-cache-delegation/fn                      compress.clj:   56
-                     io.aviso.twixt/wrap-with-tracing/fn/fn                         twixt.clj:  136
-                                    io.aviso.tracker/track*                       tracker.clj:   41
-                        io.aviso.twixt/wrap-with-tracing/fn                         twixt.clj:  134
-----                        
+----
 
-Tracker is available under the terms of the Apache Sofware License 2.0.
+Making use of this is as simple as using the *track* macro; for example, the first line in the
+logged operation trace above is the result of this code (also from Twixt):
+
+[source,clojure]
+----
+(defn wrap-pipeline-with-tracing
+  "The first middleware in the asset pipeline, used to trace the construction of the asset."
+  [asset-handler]
+  (fn [asset-path context]
+    (t/track
+      #(format "Accessing asset `%s'" asset-path)
+      (asset-handler asset-path context))))
+----
+
+The first value to track is the operation label: either a literal string, or a function that generates the label string.
+A function will only be invoked if the operation's label needs to be output, when an exception occurs.
+
+Tracker uses a dynamic binding for the operation stack; this means it can work even when an operation
+spans multiple threads, such as when using clojure.core.async.
+
+Tracker is available under the terms of the Apache Software License 2.0.
 
 link:https://portal.aviso.io/#/docs/open-source[Full Documentation]
 
