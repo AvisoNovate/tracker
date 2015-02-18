@@ -68,7 +68,7 @@
     (let [trace-label-strings (operation-labels)]
       (log-trace-label-stack logger trace-label-strings t)
       (throw (ex-info (to-message t)
-                      {:operation-trace trace-label-strings
+                      {:operation-trace    trace-label-strings
                        ;; This acts as a marker to suppress further logging of the operation trace
                        ;; as the stack unwinds.
                        ::operations-logged true}
@@ -174,10 +174,13 @@
 
 (defn timer*
   "Executes a function, timing the duration. It then calculates the elapsed time in milliseconds (as a double) and passes that to a second function.
-  The second function can log the result. Finally, the result of the main function is returned."
+  The second function can log the result. Finally, the result of the main function is returned.
+
+  This function is no longer used by the [[timer]] macro and will be removed at some future date."
+  {:deprecated "0.1.7"}
   [main-fn elapsed-fn]
-  (let [start-nanos (System/nanoTime)
-        result (main-fn)
+  (let [start-nanos   (System/nanoTime)
+        result        (main-fn)
         elapsed-nanos (- (System/nanoTime) start-nanos)]
     (elapsed-fn (double (/ elapsed-nanos 1e6)))
     result))
@@ -186,4 +189,8 @@
   "Executes the body, timing the result. The elapsed time in milliseconds (as a double) is passed to the formatter function, which returns
   a string. The resulting string is logged at level INFO."
   [formatter & body]
-  `(timer* #(do ~@body) #(l/info (~formatter %))))
+  `(let [start-nanos# (System/nanoTime)
+         result#      (do ~@body)]
+     (l/info (~formatter
+               (double (/ (- (System/nanoTime) start-nanos#) 1e6))))
+     result#))
