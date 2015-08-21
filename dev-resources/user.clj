@@ -1,13 +1,13 @@
 (ns user
-  (:use io.aviso.repl
-        io.aviso.logging
-        clojure.pprint))
+  (:require [clojure.repl :refer :all]
+            [clojure.pprint :refer :all]
+            [io.aviso.tracker :refer :all]
+            [io.aviso.repl :as repl]
+            [io.aviso.logging :as logging]))
 
-(install-pretty-exceptions)
-(io.aviso.logging/install-pretty-logging)
-(io.aviso.logging/install-uncaught-exception-handler)
-
-(use 'io.aviso.tracker)
+(repl/install-pretty-exceptions)
+(logging/install-pretty-logging)
+(logging/install-uncaught-exception-handler)
 
 (defmacro other-thread
   [& body]

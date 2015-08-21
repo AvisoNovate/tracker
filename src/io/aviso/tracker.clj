@@ -38,16 +38,29 @@
 (defn- error [logger message]
   (l/log* logger :error nil message))
 
+(defn format-operation-labels
+  "Formats the operation trace, the set of labels for the nested operations provied to
+  [[trace]]. By default, uses [[operation-labels]] to obtain the current labels.
+  The result is a multi-line string consisting of the index numbers and the labels,
+  as often seen in output:
+
+      [  1] - Outermost operation
+      [  2] - Middle operation
+      [  3] - Innermost operation"
+  {:added "0.1.7"}
+  ([]
+   (format-operation-labels (operation-labels)))
+  ([labels]
+   (->> (map-indexed (fn [i label]
+                       (format "[%3d] - %s" (inc i) label))
+                     labels)
+        (str/join writer/eol))))
+
 (defn- log-trace-label-stack
-  [logger trace-labels e]
-  (let [lines (concat ["An exception has occurred:"]
-                      (map-indexed (fn [i label]
-                                     (format "[%3d] - %s" (inc i) label))
-                                   trace-labels)
-                      [(exception/format-exception e)])]
-    (->> lines
-         (str/join writer/eol)
-         (error logger))))
+  [logger labels e]
+  (error logger (format "An exception has occurred:%n%s%n%s"
+                        (format-operation-labels labels)
+                        (exception/format-exception e))))
 
 (defn- should-log-operations?
   "Checks the exception, and its chain of causes, for the ::operations-logged flag."

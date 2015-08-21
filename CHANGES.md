@@ -1,6 +1,11 @@
-## 0.1.7 -- UNRELEASED
+## 0.1.7 -- 21 Aug 2015
 
 Changed the timer macro to no longer invoke timer*; timer* is now deprecated.
+
+Added io.aviso.tracker/format-operation-labels as a way to get the active operation labels as a formatted
+string.
+
+Updated various dependencies to latest.
 
 ## 0.1.6 -- 10 Feb 2014
 
